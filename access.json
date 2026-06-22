@@ -1,23 +1,63 @@
 {
-  "user_access": {},
-  "user_stats": {},
-  "user_roles": {},
+  "user_access": {
+    "8091316478": 1782142301.97375
+  },
+  "user_stats": {
+    "8477982865": {
+      "generations": 0,
+      "last_active": "2026-06-22T22:22:59.876771",
+      "joined": "2026-06-22T21:50:47.249311",
+      "onboarded": true,
+      "username": "zyrondevv",
+      "datadome_count": 1
+    },
+    "8091316478": {
+      "generations": 0,
+      "last_active": "2026-06-22T22:32:58.957499",
+      "joined": "2026-06-22T22:24:19.834022",
+      "onboarded": true,
+      "username": "Prudz101",
+      "sms_bomb_today": 0,
+      "boost_today": 0,
+      "generate_today": 0,
+      "last_reset_date": "2026-06-22",
+      "keys_redeemed": 1,
+      "key_total_days": 0.041666666666666664
+    }
+  },
+  "user_roles": {
+    "8477982865": "owner",
+    "8091316478": "basic"
+  },
   "access_keys": {},
-  "used_keys": [],
+  "used_keys": [
+    "ZyronYZCV-ND7G-MV5Y"
+  ],
   "banned_users": [],
   "blacklisted_keys": [],
-  "key_redemption_log": [],
+  "key_redemption_log": [
+    {
+      "key": "ZyronYZCV-ND7G-MV5Y",
+      "user_id": 8091316478,
+      "username": "@Prudz101",
+      "ts": "2026-06-22 22:31"
+    }
+  ],
   "global_stats": {
     "total_keys_generated": 0,
-    "total_keys_redeemed": 0,
+    "total_keys_redeemed": 2,
     "total_files_generated": 0,
     "total_bomber_attacks": 0,
-    "total_boosts": 0
+    "total_boosts": 1,
+    "total_boost_uses": 1,
+    "keys_generated_total": 2
   },
   "tool_hourly_usage": {
     "generate": {},
     "sms_bomb": {},
-    "boost": {},
+    "boost": {
+      "1782136800": 1
+    },
     "encrypt": {},
     "datadome": {}
   }
