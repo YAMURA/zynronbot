@@ -67,6 +67,27 @@ load_dotenv()
 
 init(autoreset=True)
 
+# ========== VERCEL COMPATIBILITY ==========
+# This MUST be at the global scope for Vercel to find it
+import os
+import sys
+
+# Flag to detect Vercel environment
+IS_VERCEL = os.getenv("VERCEL") or os.getenv("VERCEL_ENV") or False
+
+# If on Vercel, we need to initialize FastAPI early
+if IS_VERCEL:
+    try:
+        from fastapi import FastAPI, Request
+        # Create the FastAPI app at global scope
+        web_app = FastAPI(title="Zyron Bot API")
+        app = web_app  # This is what Vercel looks for
+    except ImportError:
+        # Fallback - Vercel will still fail but at least we tried
+        app = None
+else:
+    app = None  # Will be set later in local mode
+    
 # Suppress PTB per_message warning — ConversationHandler uses mixed
 # CallbackQueryHandler + MessageHandler states which is intentional
 warnings.filterwarnings("ignore", message="If 'per_message=False'", category=UserWarning)
