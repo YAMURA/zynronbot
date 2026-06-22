@@ -277,7 +277,7 @@ async def check_generate_cooldown(update: Update) -> bool:
 TOOLS_FOLDER = "tools"
 
 # ── Sensitive config loaded from .env (never hardcode in source) ──────────────
-TOKEN = "8530070217:AAE5fvtj3xVeKVgmwd225xOl38sfYsb1w8c"
+TOKEN = "8530070217:AAHiMcVx1MTRjsPm6d7o9-9vj0VUn8RNgFM"
 ADMIN_ID = 8477982865
 KEY_PREFIX = "Zyron"
 
