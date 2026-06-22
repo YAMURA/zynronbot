@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: zyron-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: TOKEN
+        sync: false
+    healthCheckPath: /health
+    autoDeploy: true
