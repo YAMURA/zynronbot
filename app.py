@@ -11,7 +11,6 @@ import string
 from pathlib import Path
 import logging
 from typing import Dict, List, Optional, Tuple
-
 import gzip
 import lzma
 import zlib
@@ -19,10 +18,8 @@ import base64
 import marshal
 import hashlib
 import urllib.parse
-
 from Crypto.Cipher import AES
 from colorama import init, Fore, Back, Style
-
 from telegram import Update, InputFile, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, Message, Chat, BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeChat
 from telegram.ext import (
     Application,
@@ -36,7 +33,6 @@ from telegram.ext import (
     ConversationHandler
 )
 from telegram.error import BadRequest, NetworkError, TimedOut, Forbidden
-
 async def safe_answer_callback(query, *args, **kwargs):
     """Wrapper for callback_query.answer() that silently ignores
     'Query is too old / invalid' BadRequest errors (happens after
@@ -52,8 +48,6 @@ async def safe_answer_callback(query, *args, **kwargs):
             raise
     except Exception:
         pass
-
-
 import requests
 from fake_useragent import UserAgent
 import concurrent.futures
@@ -61,11 +55,12 @@ import threading
 import aiohttp
 from urllib.parse import urlparse
 import uuid
-
 from dotenv import load_dotenv
 load_dotenv()
 
 init(autoreset=True)
+
+os.environ["WEB_CONCURRENCY"] = "1"
 
 # Suppress PTB per_message warning — ConversationHandler uses mixed
 # CallbackQueryHandler + MessageHandler states which is intentional
@@ -10863,15 +10858,47 @@ async def userlookup_by_username(username: str) -> int | None:
 
 
 def main():
-    """Start the bot."""
-    _acquire_pid_lock()
-    import atexit, signal
-    atexit.register(_release_pid_lock)
-    def _sig_handler(sig, frame):
-        _release_pid_lock()
-        raise SystemExit(0)
-    signal.signal(signal.SIGTERM, _sig_handler)
-
+    """Start the bot with proper single-instance locking."""
+    import fcntl
+    import sys
+    import os
+    import signal
+    import atexit
+    
+    # ============================================================
+    # PREVENT MULTIPLE INSTANCES - FIXES THE CONFLICT ERROR
+    # ============================================================
+    try:
+        lock_file = open("/tmp/bot.lock", "w")
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        print("✅ Lock acquired - bot starting...")
+    except IOError:
+        print("❌ Bot is already running. Exiting to avoid conflict.")
+        sys.exit(0)
+    
+    # Clean up lock file on exit
+    def cleanup_lock():
+        try:
+            os.remove("/tmp/bot.lock")
+            print("🔓 Lock released.")
+        except:
+            pass
+    
+    atexit.register(cleanup_lock)
+    
+    # Handle SIGTERM gracefully (Render sends this on shutdown)
+    def signal_handler(sig, frame):
+        print(f"⚠️ Received signal {sig}, shutting down...")
+        cleanup_lock()
+        sys.exit(0)
+    
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+    
+    # ============================================================
+    # YOUR EXISTING CODE STARTS HERE
+    # ============================================================
+    
     # Ensure data directories exist
     for path in [ACCESS_FILE, KEYS_FILE, REFERRAL_FILE]:
         dir_ = os.path.dirname(path)
@@ -10889,7 +10916,7 @@ def main():
     application = (
         Application.builder()
         .token(TOKEN)
-        .read_timeout(60)        # increased: Telegram long-poll can hold ~50s
+        .read_timeout(60)
         .write_timeout(60)
         .connect_timeout(30)
         .pool_timeout(60)
@@ -10900,9 +10927,6 @@ def main():
     enc_conv_handler = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(start_encryption, pattern="^start_encryption$"),
-            # Also handle the reply-keyboard button press so the conversation
-            # state is properly registered (otherwise the count input falls
-            # through to handle_unknown_message → "UNKNOWN COMMAND")
             MessageHandler(
                 filters.TEXT & filters.Regex(r"^🔐") & ~filters.COMMAND,
                 start_encryption
@@ -10950,7 +10974,6 @@ def main():
     application.add_handler(CommandHandler("bans",   bans_command))
     application.add_handler(CommandHandler("feedbacks", show_feedbacks_command))
     application.add_handler(CommandHandler("usercount", usercount_command))
-    # ── Admin commands (were missing from registration) ──
     application.add_handler(CommandHandler("approve",     approve_command))
     application.add_handler(CommandHandler("genkey",      genkey_command))
     application.add_handler(CommandHandler("delkey",      delkey_command))
@@ -10967,7 +10990,6 @@ def main():
     application.add_handler(CommandHandler("setquota",    setquota_command))
     application.add_handler(CommandHandler("backup",      admin_backup_command))
     application.add_handler(CommandHandler("helpadmin",   helpadmin_command))
-    # ── User QoL commands ──
     application.add_handler(CommandHandler("profile",     profile_command))
     application.add_handler(CommandHandler("checkin",     checkin_command))
     application.add_handler(CommandHandler("refer",       refer_command))
@@ -10978,7 +11000,6 @@ def main():
     application.add_handler(CommandHandler("listadmins",  listadmins_command))
     application.add_handler(CommandHandler("userinfo",    userinfo_command))
     application.add_handler(CommandHandler("delnote",       delnote_command))
-    # ── New v2.3.0 commands ──
     application.add_handler(CommandHandler("blacklistkey",   blacklistkey_command))
     application.add_handler(CommandHandler("extend",         extend_command))
     application.add_handler(CommandHandler("keylog",         keylog_command))
@@ -10992,7 +11013,7 @@ def main():
     application.add_handler(CommandHandler("undodelkey",     undodelkey_command))
     application.add_handler(CommandHandler("bothealth",      bothealth_command))
 
-    # ── VIP-exclusive commands ──────────────────────────────────
+    # VIP-exclusive commands
     application.add_handler(CommandHandler("vipmenu",   vipmenu_command))
     application.add_handler(CommandHandler("vipstats",  vipstats_command))
     application.add_handler(CommandHandler("vipperks",  vipperks_command))
@@ -11000,21 +11021,22 @@ def main():
     application.add_handler(CommandHandler("bulkgen",   bulkgen_command))
     application.add_handler(CommandHandler("checkup",   checkup_command))
 
-    # VIP callback handler (must be before generic)
+    # VIP callback handler
     application.add_handler(CallbackQueryHandler(
         _handle_vip_callbacks,
         pattern=r"^(vip_stats|vip_bulkgen|vip_checkup|vip_menu_cb|vip_multiboost|vip_export)$"
     ))
+    
     # Callback query handler
     application.add_handler(CallbackQueryHandler(handle_callback_query))
     
     # Message handlers
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unknown_message))
     application.add_handler(MessageHandler(filters.Document.ALL, handle_unknown_message))
+    
     # Register global error handler
     application.add_error_handler(error_handler)
 
-    # Register bot command menu (shows in Telegram / menu)
     async def _cleanup_generated_dir(context):
         """Job: delete any leftover generated files older than 5 minutes."""
         cutoff = time.time() - 300
@@ -11033,7 +11055,6 @@ def main():
         await set_bot_commands(app)
         _jk = {"coalesce": True, "misfire_grace_time": None}
     
-    # Check if job_queue exists before using it
         if app.job_queue is not None:
             app.job_queue.run_repeating(check_expiry_notifications, interval=3600, first=30, job_kwargs=_jk)
             app.job_queue.run_repeating(_cleanup_generated_dir, interval=300, first=60, job_kwargs=_jk)
@@ -11044,14 +11065,19 @@ def main():
             logging.warning("JobQueue is not available - scheduled tasks disabled")
     
         await send_startup_dm(app.bot)
+    
     application.post_init = on_startup
 
     async def on_shutdown(app):
         save_access()
         logging.info("[shutdown] Final save complete.")
+    
     application.post_shutdown = on_shutdown
 
-    # Start the bot
+    # ============================================================
+    # START THE BOT
+    # ============================================================
+    
     now_ts_start = time.time()
     active_at_start = sum(1 for e in USER_ACCESS.values() if e is None or e > now_ts_start)
     logging.info("=" * 52)
@@ -11066,12 +11092,19 @@ def main():
     logging.info(f"🛠️  Maintenance:     {'ON' if MAINTENANCE_MODE else 'OFF'}")
     logging.info(f"🔑  Token:           {'...set' if TOKEN else '⚠️  MISSING!'}")
     logging.info("=" * 52)
-    application.run_polling(
-        allowed_updates=Update.ALL_TYPES,
-        drop_pending_updates=True,
-        # Auto-reconnect after network errors instead of crashing
-        close_loop=False,
-    )
+    
+    # Start polling with the lock held
+    try:
+        application.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,
+            close_loop=False,
+        )
+    except Exception as e:
+        logging.error(f"Bot crashed: {e}")
+        raise
+    finally:
+        cleanup_lock()
 
 if __name__ == '__main__':
     main()
