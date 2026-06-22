@@ -9631,25 +9631,34 @@ async def _handle_vip_callbacks(update: Update, context: CallbackContext):
 # ========== MAIN FUNCTION ==========
 PID_FILE = "renzo_bot.pid"
 
+import fcntl
+
 def _acquire_pid_lock():
-    """Prevent multiple bot instances. Writes PID file; exits if already running."""
-    if os.path.exists(PID_FILE):
-        try:
-            old_pid = int(open(PID_FILE).read().strip())
-            # Check if that process is actually alive
-            os.kill(old_pid, 0)
-            # Still alive — abort
-            print(f"[ERROR] Bot already running (PID {old_pid}). Stop it first or delete {PID_FILE}.")
-            raise SystemExit(1)
-        except (ProcessLookupError, ValueError):
-            pass  # stale PID file — overwrite it
-    with open(PID_FILE, "w") as f:
-        f.write(str(os.getpid()))
+    """Prevent multiple bot instances using an exclusive file lock."""
+    global _lock_file
+    
+    # Use a separate lock file
+    lock_path = "renzo_bot.lock"
+    
+    # Try to acquire an exclusive lock
+    try:
+        _lock_file = open(lock_path, 'w')
+        fcntl.flock(_lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        # Write the PID to the lock file
+        _lock_file.write(str(os.getpid()))
+        _lock_file.flush()
+        return True
+    except (OSError, IOError, BlockingIOError):
+        print("[ERROR] Bot already running. Stop the other instance first.")
+        return False
 
 def _release_pid_lock():
     try:
-        os.remove(PID_FILE)
-    except FileNotFoundError:
+        if '_lock_file' in globals() and _lock_file:
+            fcntl.flock(_lock_file, fcntl.LOCK_UN)
+            _lock_file.close()
+            os.remove("renzo_bot.lock")
+    except Exception:
         pass
 
 
