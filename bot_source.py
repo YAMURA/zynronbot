@@ -277,17 +277,17 @@ async def check_generate_cooldown(update: Update) -> bool:
 TOOLS_FOLDER = "tools"
 
 # ── Sensitive config loaded from .env (never hardcode in source) ──────────────
-TOKEN = "8530070217:AAF1yPijBzh8_ZTuLn5xmLZ3DXQ3SMT3pJU"
+TOKEN = "8530070217:AAE5fvtj3xVeKVgmwd225xOl38sfYsb1w8c"
 ADMIN_ID = 8477982865
 KEY_PREFIX = "Zyron"
 
 # ── Channel Join Requirement ──────────────────────────────────────────────────
 REQUIRED_CHANNEL = "@VoxCaediteChannel"          # primary channel username
-REQUIRED_CHANNEL_ID = -1004479397888            # primary channel numeric ID
+REQUIRED_CHANNEL_ID = -1002900978162            # primary channel numeric ID
 
 # ── Second required channel ───────────────────────────────────────
-REQUIRED_CHANNEL_2 = "@VoxCaediteChannel"
-REQUIRED_CHANNEL_2_ID = -1004479397888
+REQUIRED_CHANNEL_2 = "@VoxCaediteDiscussion"
+REQUIRED_CHANNEL_2_ID = -1003006421548
 
 # All required channels as a list for easy iteration
 REQUIRED_CHANNELS = [
