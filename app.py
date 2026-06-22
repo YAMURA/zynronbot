@@ -11092,7 +11092,26 @@ def main():
     logging.info(f"🛠️  Maintenance:     {'ON' if MAINTENANCE_MODE else 'OFF'}")
     logging.info(f"🔑  Token:           {'...set' if TOKEN else '⚠️  MISSING!'}")
     logging.info("=" * 52)
-    
+
+from flask import Flask
+import threading
+import os
+
+# Create a simple web server for Render's health checks
+web_app = Flask(__name__)
+
+@web_app.route('/')
+@web_app.route('/health')
+def health():
+    return "OK", 200
+
+def run_web_server():
+    port = int(os.environ.get('PORT', 10000))
+    web_app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+
+# Start the web server in a background thread
+threading.Thread(target=run_web_server, daemon=True).start()
+
     # Start polling with the lock held
     try:
         application.run_polling(
