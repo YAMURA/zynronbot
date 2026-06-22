@@ -10898,7 +10898,7 @@ def main():
     application = (
         Application.builder()
         .token(TOKEN)
-        .read_timeout(60)        # increased: Telegram long-poll can hold ~50s
+        .read_timeout(60)
         .write_timeout(60)
         .connect_timeout(30)
         .pool_timeout(60)
@@ -10909,9 +10909,6 @@ def main():
     enc_conv_handler = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(start_encryption, pattern="^start_encryption$"),
-            # Also handle the reply-keyboard button press so the conversation
-            # state is properly registered (otherwise the count input falls
-            # through to handle_unknown_message → "UNKNOWN COMMAND")
             MessageHandler(
                 filters.TEXT & filters.Regex(r"^🔐") & ~filters.COMMAND,
                 start_encryption
@@ -10959,7 +10956,6 @@ def main():
     application.add_handler(CommandHandler("bans",   bans_command))
     application.add_handler(CommandHandler("feedbacks", show_feedbacks_command))
     application.add_handler(CommandHandler("usercount", usercount_command))
-    # ── Admin commands (were missing from registration) ──
     application.add_handler(CommandHandler("approve",     approve_command))
     application.add_handler(CommandHandler("genkey",      genkey_command))
     application.add_handler(CommandHandler("delkey",      delkey_command))
@@ -10976,7 +10972,6 @@ def main():
     application.add_handler(CommandHandler("setquota",    setquota_command))
     application.add_handler(CommandHandler("backup",      admin_backup_command))
     application.add_handler(CommandHandler("helpadmin",   helpadmin_command))
-    # ── User QoL commands ──
     application.add_handler(CommandHandler("profile",     profile_command))
     application.add_handler(CommandHandler("checkin",     checkin_command))
     application.add_handler(CommandHandler("refer",       refer_command))
@@ -10987,7 +10982,6 @@ def main():
     application.add_handler(CommandHandler("listadmins",  listadmins_command))
     application.add_handler(CommandHandler("userinfo",    userinfo_command))
     application.add_handler(CommandHandler("delnote",       delnote_command))
-    # ── New v2.3.0 commands ──
     application.add_handler(CommandHandler("blacklistkey",   blacklistkey_command))
     application.add_handler(CommandHandler("extend",         extend_command))
     application.add_handler(CommandHandler("keylog",         keylog_command))
@@ -11001,7 +10995,7 @@ def main():
     application.add_handler(CommandHandler("undodelkey",     undodelkey_command))
     application.add_handler(CommandHandler("bothealth",      bothealth_command))
 
-    # ── VIP-exclusive commands ──────────────────────────────────
+    # VIP-exclusive commands
     application.add_handler(CommandHandler("vipmenu",   vipmenu_command))
     application.add_handler(CommandHandler("vipstats",  vipstats_command))
     application.add_handler(CommandHandler("vipperks",  vipperks_command))
@@ -11009,23 +11003,24 @@ def main():
     application.add_handler(CommandHandler("bulkgen",   bulkgen_command))
     application.add_handler(CommandHandler("checkup",   checkup_command))
 
-    # VIP callback handler (must be before generic)
+    # VIP callback handler
     application.add_handler(CallbackQueryHandler(
         _handle_vip_callbacks,
         pattern=r"^(vip_stats|vip_bulkgen|vip_checkup|vip_menu_cb|vip_multiboost|vip_export)$"
     ))
+    
     # Callback query handler
     application.add_handler(CallbackQueryHandler(handle_callback_query))
     
     # Message handlers
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unknown_message))
     application.add_handler(MessageHandler(filters.Document.ALL, handle_unknown_message))
-    # Register global error handler
+    
+    # Global error handler
     application.add_error_handler(error_handler)
 
-    # Register bot command menu (shows in Telegram / menu)
+    # Setup jobs and startup
     async def _cleanup_generated_dir(context):
-        """Job: delete any leftover generated files older than 5 minutes."""
         cutoff = time.time() - 300
         cleaned = 0
         for f in GENERATED_DIR.glob("*"):
@@ -11041,8 +11036,7 @@ def main():
     async def on_startup(app):
         await set_bot_commands(app)
         _jk = {"coalesce": True, "misfire_grace_time": None}
-    
-    # Check if job_queue exists before using it
+        
         if app.job_queue is not None:
             app.job_queue.run_repeating(check_expiry_notifications, interval=3600, first=30, job_kwargs=_jk)
             app.job_queue.run_repeating(_cleanup_generated_dir, interval=300, first=60, job_kwargs=_jk)
@@ -11051,38 +11045,109 @@ def main():
             app.job_queue.run_repeating(check_resource_alerts, interval=600, first=120, job_kwargs=_jk)
         else:
             logging.warning("JobQueue is not available - scheduled tasks disabled")
-    
+        
         await send_startup_dm(app.bot)
+    
     application.post_init = on_startup
 
     async def on_shutdown(app):
         save_access()
         logging.info("[shutdown] Final save complete.")
+    
     application.post_shutdown = on_shutdown
 
-    # Start the bot
-    now_ts_start = time.time()
-    active_at_start = sum(1 for e in USER_ACCESS.values() if e is None or e > now_ts_start)
-    logging.info("=" * 52)
-    logging.info(f"✅  RenzoVIPTOOLS v{BOT_VERSION} ({BOT_BUILD_DATE}) started")
-    logging.info(f"👥  Users loaded:    {len(USER_ACCESS)} ({active_at_start} active)")
-    logging.info(f"🔑  Keys available:  {len(ACCESS_KEYS)}")
-    logging.info(f"🔗  Referrals:       {len(REFERRAL_DATA)}")
-    logging.info(f"🚫  Banned:          {len(BANNED_USERS)}")
-    logging.info(f"🗂️  Databases:       {len(DATABASE_FILES)} loaded")
-    logging.info(f"📢  Channel:         {REQUIRED_CHANNEL}")
-    logging.info(f"📡  Log channel:     {'set (' + str(LOG_CHANNEL_ID) + ')' if LOG_CHANNEL_ID else 'not set'}")
-    logging.info(f"🛠️  Maintenance:     {'ON' if MAINTENANCE_MODE else 'OFF'}")
-    logging.info(f"🔑  Token:           {'...set' if TOKEN else '⚠️  MISSING!'}")
-    logging.info("=" * 52)
-    application.run_polling(
-        allowed_updates=Update.ALL_TYPES,
-        drop_pending_updates=True,
-        # Auto-reconnect after network errors instead of crashing
-        close_loop=False,
-    )
+    # ========== VERCEL DEPLOYMENT MODE ==========
+    # Check if running on Vercel
+    if os.getenv("VERCEL") or os.getenv("VERCEL_ENV"):
+        logging.info("✅ Running on Vercel - Webhook mode enabled")
+        # Return the application for Vercel to use
+        return application
+    else:
+        # Local development - run polling
+        now_ts_start = time.time()
+        active_at_start = sum(1 for e in USER_ACCESS.values() if e is None or e > now_ts_start)
+        logging.info("=" * 52)
+        logging.info(f"✅  RenzoVIPTOOLS v{BOT_VERSION} ({BOT_BUILD_DATE}) started")
+        logging.info(f"👥  Users loaded:    {len(USER_ACCESS)} ({active_at_start} active)")
+        logging.info(f"🔑  Keys available:  {len(ACCESS_KEYS)}")
+        logging.info(f"🔗  Referrals:       {len(REFERRAL_DATA)}")
+        logging.info(f"🚫  Banned:          {len(BANNED_USERS)}")
+        logging.info(f"🗂️  Databases:       {len(DATABASE_FILES)} loaded")
+        logging.info(f"📢  Channel:         {REQUIRED_CHANNEL}")
+        logging.info(f"📡  Log channel:     {'set (' + str(LOG_CHANNEL_ID) + ')' if LOG_CHANNEL_ID else 'not set'}")
+        logging.info(f"🛠️  Maintenance:     {'ON' if MAINTENANCE_MODE else 'OFF'}")
+        logging.info(f"🔑  Token:           {'...set' if TOKEN else '⚠️  MISSING!'}")
+        logging.info("=" * 52)
+        
+        application.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,
+            close_loop=False,
+        )
+        return None
+        
+# ========== FASTAPI WRAPPER FOR VERCEL ==========
+try:
+    from fastapi import FastAPI, Request
+    import uvicorn
+    
+    # Create FastAPI app
+    web_app = FastAPI(title="Zyron Bot API", version=BOT_VERSION)
+    
+    # Initialize the bot application
+    bot_app = main()
+    
+    @web_app.get("/")
+    async def root():
+        return {
+            "status": "online",
+            "version": BOT_VERSION,
+            "name": "Zyron VIP Tools Bot",
+            "uptime": get_uptime(),
+            "users": len(USER_ACCESS),
+            "keys": len(ACCESS_KEYS)
+        }
+    
+    @web_app.post("/webhook")
+    async def webhook(request: Request):
+        """Telegram webhook endpoint"""
+        try:
+            data = await request.json()
+            # Process the update
+            await bot_app.process_update(data)
+            return {"ok": True}
+        except Exception as e:
+            logging.error(f"Webhook error: {e}")
+            return {"ok": False, "error": str(e)}
+    
+    @web_app.get("/health")
+    async def health():
+        return {"status": "healthy", "version": BOT_VERSION}
+    
+    # For Vercel, export the FastAPI app
+    app = web_app
+    
+except ImportError:
+    # FastAPI not installed - fallback for local development
+    logging.warning("FastAPI not installed. Running in polling mode.")
+    if __name__ == "__main__":
+        main()
 
-if __name__ == '__main__':
-    main()
+# ========== VERCEL ENTRY POINT ==========
+# This is what Vercel looks for
+try:
+    from fastapi import FastAPI
+    # app is already defined above
+    pass
+except ImportError:
+    # If FastAPI is not available, create a dummy
+    app = None
+    logging.warning("FastAPI not available - Vercel deployment will fail")
 
-# ══════════════════════════════════════════════════════════════════════════════
+# For local development
+if __name__ == "__main__":
+    # Check if we should run in polling mode
+    if not os.getenv("VERCEL"):
+        main()
+    else:
+        logging.info("Running on Vercel - use the webhook endpoint")
