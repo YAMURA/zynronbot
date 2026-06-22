@@ -1,0 +1,10 @@
+aiohttp>=3.9.0
+apscheduler>=3.10.0
+colorama>=0.4.6
+cryptography>=41.0.0
+fake-useragent>=1.5.0
+python-dotenv>=1.0.0
+python-telegram-bot>=20.7
+pycryptodome>=3.20.0
+requests>=2.31.0
+urllib3>=2.0.0
