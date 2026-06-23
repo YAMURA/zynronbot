@@ -283,7 +283,7 @@ KEY_PREFIX = "Zyron"
 
 # ── Channel Join Requirement ──────────────────────────────────────────────────
 REQUIRED_CHANNEL = "@VoxCaediteChannel"          # primary channel username
-REQUIRED_CHANNEL_ID = -1002900978162            # primary channel numeric ID
+REQUIRED_CHANNEL_ID = -1004479397888            # primary channel numeric ID
 
 # ── Second required channel ───────────────────────────────────────
 REQUIRED_CHANNEL_2 = "@VoxCaediteDiscussion"
