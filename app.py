@@ -19,6 +19,8 @@ import base64
 import marshal
 import hashlib
 import urllib.parse
+import bz2  # ADDED: missing import
+import secrets as _secrets
 
 from Crypto.Cipher import AES
 from colorama import init, Fore, Back, Style
